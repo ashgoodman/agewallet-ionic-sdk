@@ -1,0 +1,41 @@
+{
+  "name": "agewallet-ionic-sdk",
+  "version": "1.0.0",
+  "description": "AgeWallet age verification SDK for Ionic/Capacitor applications",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "agewallet",
+    "age-verification",
+    "ionic",
+    "capacitor",
+    "oidc",
+    "pkce"
+  ],
+  "author": "AgeWallet",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agewallet/agewallet-ionic-sdk.git"
+  },
+  "peerDependencies": {
+    "@capacitor/app": "^5.0.0 || ^6.0.0",
+    "@capacitor/browser": "^5.0.0 || ^6.0.0",
+    "@capacitor/preferences": "^5.0.0 || ^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/preferences": "^6.0.0",
+    "typescript": "^5.0.0"
+  }
+}
