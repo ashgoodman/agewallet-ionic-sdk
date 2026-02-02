@@ -140,7 +140,9 @@ export class AgeWallet {
 
     // Handle error response
     if (error) {
-      return this.handleError(error, errorDescription, state);
+      console.error(`[AgeWallet] Authorization error: ${error} - ${errorDescription}`);
+      await clearOidcState();
+      return false;
     }
 
     // Validate required parameters
@@ -198,44 +200,6 @@ export class AgeWallet {
       await clearOidcState();
       return false;
     }
-  }
-
-  /**
-   * Handle OIDC error response.
-   */
-  private async handleError(
-    error: string,
-    description: string | null,
-    state: string | null
-  ): Promise<boolean> {
-    // Validate state even for errors
-    const storedOidc = await getOidcState();
-    if (!storedOidc || storedOidc.state !== state) {
-      console.warn('[AgeWallet] Error received with invalid state');
-      await clearOidcState();
-      return false;
-    }
-
-    // Check for regional exemption
-    if (error === 'access_denied' && description === 'Region does not require verification') {
-      console.log('[AgeWallet] Region exempt - granting 24h verification');
-
-      // Grant synthetic 24-hour verification
-      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-
-      await setVerification({
-        accessToken: 'region_exempt',
-        expiresAt,
-        isVerified: true,
-      });
-
-      await clearOidcState();
-      return true;
-    }
-
-    console.error(`[AgeWallet] Authorization error: ${error} - ${description}`);
-    await clearOidcState();
-    return false;
   }
 
   /**
