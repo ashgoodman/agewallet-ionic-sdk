@@ -2,7 +2,7 @@ import { AgeWallet } from 'agewallet-ionic-sdk';
 
 // Initialize SDK
 const ageWallet = new AgeWallet({
-  clientId: 'your-client-id',
+  clientId: '239472f9-3398-47ea-ad13-fe9502a0eb33',
   redirectUri: 'https://agewallet-sdk-demo.netlify.app/callback',
 });
 
@@ -24,13 +24,14 @@ async function checkVerification() {
 // Start verification flow
 async function startVerification() {
   verifyBtn.disabled = true;
+  showLoading(true);
   try {
     await ageWallet.startVerification();
     const isVerified = await ageWallet.isVerified();
     updateUI(isVerified);
   } catch (error) {
     console.error('Verification failed:', error);
-    alert('Verification failed. Please try again.');
+    updateUI(false);
   } finally {
     verifyBtn.disabled = false;
   }

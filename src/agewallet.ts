@@ -68,7 +68,7 @@ export class AgeWallet {
 
   /**
    * Start the verification flow.
-   * Opens the system browser to the AgeWallet authorization page.
+   * Opens the system browser and resolves only after the OIDC callback is received and processed.
    */
   async startVerification(): Promise<void> {
     // Generate PKCE parameters
@@ -79,9 +79,6 @@ export class AgeWallet {
 
     // Store OIDC state for callback validation
     await setOidcState({ state, verifier, nonce });
-
-    // Set up deep link listener before opening browser
-    this.setupDeepLinkListener();
 
     // Build authorization URL
     const params = new URLSearchParams({
@@ -97,31 +94,30 @@ export class AgeWallet {
 
     const authUrl = `${this.authEndpoint}?${params.toString()}`;
 
-    // Open browser
-    await Browser.open({ url: authUrl });
-  }
+    // Return a Promise that resolves only when the deep link callback is handled
+    return new Promise<void>((resolve, reject) => {
+      this.listenerHandle = App.addListener('appUrlOpen', async (event) => {
+        const url = event.url;
 
-  /**
-   * Set up listener for deep link callbacks.
-   */
-  private setupDeepLinkListener(): void {
-    this.listenerHandle = App.addListener('appUrlOpen', async (event) => {
-      const url = event.url;
+        if (url.startsWith(this.config.redirectUri)) {
+          await Browser.close();
 
-      // Check if this is our callback URL
-      if (url.startsWith(this.config.redirectUri)) {
-        // Close browser
-        await Browser.close();
+          if (this.listenerHandle) {
+            (await this.listenerHandle).remove();
+            this.listenerHandle = null;
+          }
 
-        // Handle the callback
-        await this.handleCallback(url);
-
-        // Remove listener
-        if (this.listenerHandle) {
-          (await this.listenerHandle).remove();
-          this.listenerHandle = null;
+          const success = await this.handleCallback(url);
+          if (success) {
+            resolve();
+          } else {
+            reject(new Error('[AgeWallet] Verification failed'));
+          }
         }
-      }
+      });
+
+      // Open browser after listener is registered
+      Browser.open({ url: authUrl }).catch(reject);
     });
   }
 
