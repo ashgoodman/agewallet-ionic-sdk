@@ -1,0 +1,39 @@
+workflows:
+  ionic-ios-demo:
+    name: Ionic iOS Demo
+    instance_type: mac_mini_m2
+    environment:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: io.agewallet.sdk.demo.ionic
+      node: 20
+      xcode: latest
+    scripts:
+      - name: Register test devices
+        script: |
+          app-store-connect devices register "Ash's iPhone" "00008150-001A0DE826B8401C"
+      - name: Install dependencies and build web assets
+        script: |
+          npm install
+          npm run build
+        working_directory: example
+      - name: Sync Capacitor
+        script: npx cap sync ios
+        working_directory: example
+      - name: Install CocoaPods
+        script: pod install
+        working_directory: example/ios/App
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace example/ios/App/App.xcworkspace \
+            --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
