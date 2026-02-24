@@ -5,15 +5,33 @@ workflows:
     integrations:
       app_store_connect: AgeWallet ASC API Key
     environment:
-      ios_signing:
-        distribution_type: ad_hoc
-        bundle_identifier: io.agewallet.sdk.demo.ionic
+      groups:
+        - ios_signing
       node: 20
       xcode: latest
     scripts:
       - name: Register test devices
         script: |
-          app-store-connect devices register "Ash's iPhone" "00008150-001A0DE826B8401C"
+          app-store-connect devices register --name "Ash's iPhone" --udid "00008150-001A0DE826B8401C" --ignore-registration-errors
+          app-store-connect devices register --name "Brady's iPhone" --udid "00008130-0012590E21F0001C" --ignore-registration-errors
+      - name: Register bundle ID and enable Associated Domains
+        script: |
+          app-store-connect bundle-ids create --identifier io.agewallet.sdk.demo.ionic --name "AgeWallet Ionic Demo" --platform IOS || true
+          BUNDLE_RESOURCE_ID=$(app-store-connect bundle-ids list --bundle-id-identifier io.agewallet.sdk.demo.ionic --json | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['id'])")
+          app-store-connect bundle-ids enable-capabilities "$BUNDLE_RESOURCE_ID" --capability "Associated Domains"
+      - name: Set up code signing
+        script: |
+          app-store-connect fetch-signing-files "io.agewallet.sdk.demo.ionic" \
+            --type IOS_APP_ADHOC \
+            --create \
+            --delete-stale-profiles \
+            --verbose
+          keychain initialize
+          app-store-connect certificates list \
+            --type IOS_DISTRIBUTION \
+            --save \
+            --verbose
+          keychain add-certificates
       - name: Install dependencies and build web assets
         script: |
           npm install
@@ -25,13 +43,15 @@ workflows:
       - name: Install CocoaPods
         script: pod install
         working_directory: example/ios/App
-      - name: Set up code signing
+      - name: Apply code signing to Xcode project
         script: xcode-project use-profiles
       - name: Build IPA
         script: |
           xcode-project build-ipa \
             --workspace example/ios/App/App.xcworkspace \
-            --scheme App
+            --scheme App \
+            --verbose \
+            --archive-flags="-destination 'generic/platform=iOS' COMPILER_INDEX_STORE_ENABLE=NO DEVELOPMENT_TEAM=F5T3W2C69Y CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

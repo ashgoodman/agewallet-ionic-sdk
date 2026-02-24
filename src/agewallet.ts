@@ -99,7 +99,9 @@ export class AgeWallet {
       this.listenerHandle = App.addListener('appUrlOpen', async (event) => {
         const url = event.url;
 
-        if (url.startsWith(this.config.redirectUri)) {
+        const redirectUrl = new URL(this.config.redirectUri);
+        const eventUrl = new URL(url);
+        if (eventUrl.host === redirectUrl.host && eventUrl.pathname === redirectUrl.pathname) {
           await Browser.close();
 
           if (this.listenerHandle) {
