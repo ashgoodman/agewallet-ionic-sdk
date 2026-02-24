@@ -37,6 +37,8 @@ workflows:
             --create \
             --delete-stale-profiles \
             --verbose
+      - name: Install SDK dependencies
+        script: npm install
       - name: Install dependencies and build web assets
         script: |
           npm install
