@@ -37,7 +37,6 @@ async function startVerification() {
     console.error('Verification failed:', error);
     updateUI(false);
   } finally {
-    showLoading(false);
     verifyBtn.disabled = false;
   }
 }
