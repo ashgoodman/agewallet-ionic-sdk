@@ -26,13 +26,18 @@ async function startVerification() {
   verifyBtn.disabled = true;
   showLoading(true);
   try {
-    await ageWallet.startVerification();
-    const isVerified = await ageWallet.isVerified();
-    updateUI(isVerified);
+    const result = await ageWallet.startVerification();
+    updateUI(result === 'success');
+    if (result === 'denied') {
+      alert('Age verification was cancelled.');
+    } else if (result === 'failed') {
+      alert('Verification could not be completed. Please try again.');
+    }
   } catch (error) {
     console.error('Verification failed:', error);
     updateUI(false);
   } finally {
+    showLoading(false);
     verifyBtn.disabled = false;
   }
 }

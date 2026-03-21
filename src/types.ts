@@ -38,6 +38,14 @@ export interface OidcState {
 }
 
 /**
+ * Result of an age verification callback.
+ * - 'success': Verification completed successfully
+ * - 'denied': User denied consent on the AgeWallet screen
+ * - 'failed': Verification process failed (identity check unsuccessful)
+ */
+export type AgeWalletResult = 'success' | 'denied' | 'failed';
+
+/**
  * Default endpoints.
  */
 export const DEFAULT_ENDPOINTS = {

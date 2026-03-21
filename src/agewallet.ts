@@ -1,6 +1,6 @@
 import { Browser } from '@capacitor/browser';
 import { App } from '@capacitor/app';
-import type { AgeWalletConfig, VerificationState } from './types';
+import type { AgeWalletConfig, AgeWalletResult, VerificationState } from './types';
 import { DEFAULT_ENDPOINTS } from './types';
 import {
   generateVerifier,
@@ -68,9 +68,9 @@ export class AgeWallet {
 
   /**
    * Start the verification flow.
-   * Opens the system browser and resolves only after the OIDC callback is received and processed.
+   * Opens the system browser and resolves with the verification result after the OIDC callback is received and processed.
    */
-  async startVerification(): Promise<void> {
+  async startVerification(): Promise<AgeWalletResult> {
     // Generate PKCE parameters
     const verifier = generateVerifier();
     const challenge = await generateChallenge(verifier);
@@ -95,7 +95,7 @@ export class AgeWallet {
     const authUrl = `${this.authEndpoint}?${params.toString()}`;
 
     // Return a Promise that resolves only when the deep link callback is handled
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<AgeWalletResult>((resolve, reject) => {
       this.listenerHandle = App.addListener('appUrlOpen', async (event) => {
         const url = event.url;
 
@@ -109,12 +109,8 @@ export class AgeWallet {
             this.listenerHandle = null;
           }
 
-          const success = await this.handleCallback(url);
-          if (success) {
-            resolve();
-          } else {
-            reject(new Error('[AgeWallet] Verification failed'));
-          }
+          const result = await this.handleCallback(url);
+          resolve(result);
         }
       });
 
@@ -125,9 +121,9 @@ export class AgeWallet {
 
   /**
    * Handle callback URL from authorization.
-   * Returns true if verification succeeded, false otherwise.
+   * Returns an AgeWalletResult indicating the outcome.
    */
-  async handleCallback(url: string): Promise<boolean> {
+  async handleCallback(url: string): Promise<AgeWalletResult> {
     const urlObj = new URL(url);
     const params = urlObj.searchParams;
 
@@ -140,14 +136,14 @@ export class AgeWallet {
     if (error) {
       console.error(`[AgeWallet] Authorization error: ${error} - ${errorDescription}`);
       await clearOidcState();
-      return false;
+      return errorDescription === 'The user denied the request' ? 'denied' : 'failed';
     }
 
     // Validate required parameters
     if (!code || !state) {
       console.error('[AgeWallet] Missing code or state in callback');
       await clearOidcState();
-      return false;
+      return 'failed';
     }
 
     // Validate state matches stored state
@@ -155,7 +151,7 @@ export class AgeWallet {
     if (!storedOidc || storedOidc.state !== state) {
       console.error('[AgeWallet] Invalid state or session expired');
       await clearOidcState();
-      return false;
+      return 'failed';
     }
 
     try {
@@ -163,21 +159,21 @@ export class AgeWallet {
       const tokenResponse = await this.exchangeCode(code, storedOidc.verifier);
       if (!tokenResponse) {
         await clearOidcState();
-        return false;
+        return 'failed';
       }
 
       // Fetch user info to verify age claim
       const userInfo = await this.fetchUserInfo(tokenResponse.access_token);
       if (!userInfo) {
         await clearOidcState();
-        return false;
+        return 'failed';
       }
 
       // Check age_verified claim
       if (!userInfo.age_verified) {
         console.error('[AgeWallet] Age verification failed');
         await clearOidcState();
-        return false;
+        return 'failed';
       }
 
       // Calculate expiry
@@ -192,11 +188,11 @@ export class AgeWallet {
       });
 
       await clearOidcState();
-      return true;
+      return 'success';
     } catch (e) {
       console.error('[AgeWallet] Error during token exchange:', e);
       await clearOidcState();
-      return false;
+      return 'failed';
     }
   }
 

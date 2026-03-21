@@ -9,5 +9,6 @@ export { AgeWallet } from './agewallet';
 export type {
   AgeWalletConfig,
   AgeWalletEndpoints,
+  AgeWalletResult,
   VerificationState,
 } from './types';
