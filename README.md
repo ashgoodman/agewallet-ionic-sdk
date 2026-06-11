@@ -227,6 +227,7 @@ new AgeWallet(config: AgeWalletConfig)
 | `clientId` | string | Yes | Your client ID from AgeWallet dashboard |
 | `redirectUri` | string | Yes | Your app's universal link callback URL |
 | `endpoints` | AgeWalletEndpoints | No | Override default API endpoints |
+| `metadata` | string | No | Opaque per-verification string (max 4096 UTF-8 bytes) that round-trips through `/userinfo`. See [Metadata](#metadata) below. |
 
 #### Methods
 
@@ -261,6 +262,48 @@ clearVerification(): Promise<void>
 ```
 
 Clears the stored verification state (logout).
+
+##### `setMetadata(value)`
+
+```typescript
+setMetadata(value: string | null | undefined): void
+```
+
+Updates the instance default metadata attached to subsequent verifications. Pass `null`/`undefined` to clear. Throws if the value exceeds `AgeWallet.METADATA_MAX_BYTES` (4096).
+
+##### `getMetadata()`
+
+```typescript
+getMetadata(): Promise<string | null>
+```
+
+Returns the metadata that round-tripped with the currently-persisted verification, or `null` if none.
+
+##### `startVerification({ metadata }?)`
+
+The optional `metadata` parameter overrides the instance default for that one verification only — it does not mutate the default.
+
+## Metadata
+
+Attach an opaque per-verification string (max 4096 UTF-8 bytes) that round-trips through `/userinfo` and is visible to your backend and the AgeWallet dashboard. Useful for tagging build, environment, or user-flow context.
+
+```typescript
+// Set as the instance default at construction
+const ageWallet = new AgeWallet({
+  clientId: 'your-client-id',
+  redirectUri: 'https://yourapp.com/callback',
+  metadata: 'checkout-flow',
+});
+
+// Update the default at runtime
+ageWallet.setMetadata('new-default');
+
+// Override for a single verification only (does not change the default)
+await ageWallet.startVerification({ metadata: 'one-shot' });
+
+// Read the metadata that round-tripped with the current verification
+const received = await ageWallet.getMetadata();
+```
 
 ## Security
 

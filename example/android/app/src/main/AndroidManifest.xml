@@ -22,6 +22,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+        </activity>
+
+        <!-- Dedicated callback activity for the OIDC redirect URL. The intent-filter
+             lives here, NOT on MainActivity, so the netlify intent doesn't bring
+             MainActivity (and the Custom Tab it hosts) to the front and kill the
+             Custom Tab's session state mid-flow. Mirrors the Flutter demo's pattern. -->
+        <activity android:name=".AgeWalletCallbackActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -30,7 +39,6 @@
                       android:host="agewallet-sdk-demo.netlify.app"
                       android:pathPrefix="/callback" />
             </intent-filter>
-
         </activity>
 
         <provider

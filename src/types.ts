@@ -8,6 +8,8 @@ export interface AgeWalletConfig {
   redirectUri: string;
   /** Optional custom endpoint configuration */
   endpoints?: AgeWalletEndpoints;
+  /** Optional opaque per-verification metadata string (max 4096 bytes). */
+  metadata?: string;
 }
 
 /**
@@ -26,6 +28,7 @@ export interface VerificationState {
   accessToken: string;
   expiresAt: number;
   isVerified: boolean;
+  metadata?: string;
 }
 
 /**

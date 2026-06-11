@@ -1,6 +1,6 @@
 import { Browser } from '@capacitor/browser';
 import { App } from '@capacitor/app';
-import type { AgeWalletConfig, AgeWalletResult, VerificationState } from './types';
+import type { AgeWalletConfig, AgeWalletResult } from './types';
 import { DEFAULT_ENDPOINTS } from './types';
 import {
   generateVerifier,
@@ -37,11 +37,17 @@ import {
  * ```
  */
 export class AgeWallet {
+  /** Maximum byte length for the metadata string (matches server-side limit). */
+  static readonly METADATA_MAX_BYTES = 4096;
+
   private config: AgeWalletConfig;
   private authEndpoint: string;
   private tokenEndpoint: string;
   private userinfoEndpoint: string;
   private listenerHandle: Promise<{ remove: () => void }> | null = null;
+
+  /** Runtime metadata default; mutable via setMetadata(). Initialised from config.metadata. */
+  private currentMetadata: string | undefined;
 
   constructor(config: AgeWalletConfig) {
     if (!config.clientId) {
@@ -55,6 +61,9 @@ export class AgeWallet {
     this.authEndpoint = config.endpoints?.auth ?? DEFAULT_ENDPOINTS.auth;
     this.tokenEndpoint = config.endpoints?.token ?? DEFAULT_ENDPOINTS.token;
     this.userinfoEndpoint = config.endpoints?.userinfo ?? DEFAULT_ENDPOINTS.userinfo;
+
+    this.validateMetadata(config.metadata);
+    this.currentMetadata = config.metadata;
   }
 
   /**
@@ -67,14 +76,53 @@ export class AgeWallet {
   }
 
   /**
+   * Update the metadata default attached to subsequent verifications.
+   * Pass undefined or null to clear. Throws if value exceeds 4096 bytes.
+   */
+  setMetadata(value: string | undefined | null): void {
+    const normalized = value ?? undefined;
+    this.validateMetadata(normalized);
+    this.currentMetadata = normalized;
+  }
+
+  /**
+   * Return the metadata that round-tripped with the current persisted verification, or null.
+   */
+  async getMetadata(): Promise<string | null> {
+    const state = await getVerification();
+    return state?.metadata ?? null;
+  }
+
+  private validateMetadata(value: string | undefined): void {
+    if (value === undefined || value === null) return;
+    if (typeof value !== 'string') {
+      throw new Error('[AgeWallet] metadata must be a string');
+    }
+    // UTF-8 byte length via the classic encodeURIComponent trick — portable across all JS runtimes.
+    const bytes = unescape(encodeURIComponent(value)).length;
+    if (bytes > AgeWallet.METADATA_MAX_BYTES) {
+      throw new Error(`[AgeWallet] metadata exceeds ${AgeWallet.METADATA_MAX_BYTES}-byte limit`);
+    }
+  }
+
+  /**
    * Start the verification flow.
    * Opens the system browser and resolves with the verification result after the OIDC callback is received and processed.
+   *
+   * @param options.metadata - Optional per-call override; does NOT change the instance default.
    */
-  async startVerification(): Promise<AgeWalletResult> {
+  async startVerification(options: { metadata?: string } = {}): Promise<AgeWalletResult> {
+    const effectiveMetadata = options.metadata ?? this.currentMetadata;
+    this.validateMetadata(effectiveMetadata);
+
     // Generate PKCE parameters
     const verifier = generateVerifier();
     const challenge = await generateChallenge(verifier);
-    const state = generateState();
+    // Prefix matches the netlify autoMap so the callback page can auto-fire
+    // the intent for this demo's package. Without a recognized prefix the
+    // netlify page falls through to a manual button view, requiring user
+    // interaction to complete the OIDC chain.
+    const state = `ionic:${generateState()}`;
     const nonce = generateNonce();
 
     // Store OIDC state for callback validation
@@ -92,13 +140,16 @@ export class AgeWallet {
       nonce: nonce,
     });
 
+    if (effectiveMetadata) {
+      params.append('metadata', effectiveMetadata);
+    }
+
     const authUrl = `${this.authEndpoint}?${params.toString()}`;
 
     // Return a Promise that resolves only when the deep link callback is handled
     return new Promise<AgeWalletResult>((resolve, reject) => {
       this.listenerHandle = App.addListener('appUrlOpen', async (event) => {
         const url = event.url;
-
         const redirectUrl = new URL(this.config.redirectUri);
         const eventUrl = new URL(url);
         if (eventUrl.host === redirectUrl.host && eventUrl.pathname === redirectUrl.pathname) {
@@ -180,11 +231,12 @@ export class AgeWallet {
       const expiresIn = tokenResponse.expires_in ?? 3600;
       const expiresAt = Date.now() + expiresIn * 1000;
 
-      // Store verification state
+      // Store verification state (including any metadata round-tripped via /userinfo)
       await setVerification({
         accessToken: tokenResponse.access_token,
         expiresAt,
         isVerified: true,
+        ...(userInfo.metadata ? { metadata: userInfo.metadata } : {}),
       });
 
       await clearOidcState();
@@ -235,7 +287,7 @@ export class AgeWallet {
    */
   private async fetchUserInfo(
     accessToken: string
-  ): Promise<{ age_verified?: boolean } | null> {
+  ): Promise<{ age_verified?: boolean; metadata?: string } | null> {
     try {
       const response = await fetch(this.userinfoEndpoint, {
         headers: {
