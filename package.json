@@ -1,6 +1,6 @@
 {
   "name": "agewallet-ionic-sdk",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AgeWallet age verification SDK for Ionic/Capacitor applications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
